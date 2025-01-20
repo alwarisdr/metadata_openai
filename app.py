@@ -32,9 +32,9 @@ def generate_title_from_description(description):
     if not client:
         return "API Key Not Set"
     
-    prompt = f"Create a short title (not exceeding 150 characters) based on this description: {description}"
+    prompt = f"Create a short title (not exceeding 90 characters) based on this description: {description}"
     response = client.chat.completions.create(
-        model="gpt-4o-mini",
+        model="gpt-4o",
         messages=[
             {"role": "system", "content": "You are a helpful assistant that generates titles."},
             {"role": "user", "content": prompt}
@@ -101,7 +101,7 @@ def generate_content_from_filename(filename):
         Tags: [Your tags here]
         """
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-4o",
             messages=[
                 {"role": "system", "content": "You are a helpful assistant that generates SEO-optimized image metadata for stock photography platforms."},
                 {"role": "user", "content": prompt}
@@ -166,7 +166,7 @@ def select_category(filename, title, subjects, tags):
     """
     
     response = client.chat.completions.create(
-        model="gpt-4o-mini",
+        model="gpt-4o",
         messages=[
             {"role": "system", "content": "You are a helpful assistant that selects categories for images."},
             {"role": "user", "content": prompt}
