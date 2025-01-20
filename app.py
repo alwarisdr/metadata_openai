@@ -32,7 +32,7 @@ def generate_title_from_description(description):
     if not client:
         return "API Key Not Set"
     
-    prompt = f"Create a short title (not exceeding 90 characters) based on this description: {description}"
+    prompt = f"Create a short title (not exceeding 150 characters) based on this description: {description}"
     response = client.chat.completions.create(
         model="gpt-4o",
         messages=[
@@ -83,17 +83,9 @@ def generate_content_from_filename(filename):
         prompt = f"""
         Based on this filename: {filename}
         Generate the following information:
-        1. Title: A short, descriptive title (7 words or less)
-        2. Subjects: A detailed description (2-3 sentences)
-        3. Tags: Generate 20-30 relevant keywords for SEO, optimized for imstocker ranking. Follow these guidelines:
-           - Include a mix of specific and general terms related to the image
-           - Use both singular and plural forms of nouns
-           - Include synonyms and related concepts
-           - Add some descriptive adjectives
-           - Include terms related to style, mood, or technique if applicable
-           - Consider including location or cultural references if relevant
-           - Avoid overly generic terms like "image" or "picture"
-           - Separate keywords with commas
+        1. Title: A short, descriptive title (not exceeding 150 characters)
+        2. Subjects: A detailed description (4-5 sentences)
+        3. Tags: generate elaborate name and single-word keyword for microstock image. When provided with text description, you create a descriptive name and up to 49 relevant single-word keyword, formatted with comma. don't try to make it plural word, You specialize in creating extensive and descriptive names, while the keywords are short, precise, relevant,and don't pair words. Your goal is to make these images easy to find on microstock sites. Keep your keywords in a list separated by commas, not numbered. Make sure your titles are descriptive, and your replies clear and direct, helping to clear up any confusion and focusing on creating effective names and keywords for better search ability. here is example Generating Keywords from Titles. first 10 is Keyword from Title and 39 is less important but relate to title. overall , force result to reach 49 keyword . example: blank greeting card mockup, Magnolia portrait. Blank space along bottom third for text. Soft vintage color palette; keyword : blank, greeting, card, mockup, colors, magnolia, portrait, space, along, bottom, third, for, text, soft, vintage, palette, color, wedding, invitation, illustration, watercolor, botanical, foliage, elegant, frame, border, romantic, element, retro, set, graphic, invite, print, greenery, rose, drawing, art, blooming, bouquet, isolated, booklet, cover, postcard, poster, drawn, flier, wallpaper, modern, anniversary
         
         Please format your response exactly as follows:
         Title: [Your title here]
