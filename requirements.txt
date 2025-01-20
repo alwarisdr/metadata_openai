@@ -1,0 +1,7 @@
+pandas
+flask
+piexif
+werkzeug
+Pillow
+google-generativeai
+openai
