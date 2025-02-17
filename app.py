@@ -10,6 +10,7 @@ import csv
 from werkzeug.utils import secure_filename
 import openai
 import base64
+import re
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key_here'  # ควรเปลี่ยนเป็นค่าที่ซับซ้อนและเก็บเป็นความลับ
@@ -36,7 +37,7 @@ def generate_title_from_description(description):
     
     prompt = f"Create a short title (not exceeding 150 characters) based on this description: {description}"
     response = client.chat.completions.create(
-        model="gpt-4o",
+        model="gpt-4o-mini",
         messages=[
             {"role": "system", "content": "You are a helpful assistant that generates titles."},
             {"role": "user", "content": prompt}
@@ -102,7 +103,7 @@ def generate_content_from_filename(filename):
         Tags: [Your tags here] 
         """
         response = client.chat.completions.create(
-            model="gpt-4o",
+            model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": "You are a helpful assistant that generates SEO-optimized image metadata for stock photography platforms."},
                 {"role": "user", "content": prompt}
@@ -116,6 +117,8 @@ def generate_content_from_filename(filename):
             print("Token usage data not available.")
 
         print(f"Raw API response: {response.choices[0].message.content}")
+
+       
         
         title = "Untitled Image"
         subjects = "No subjects available"
@@ -179,7 +182,7 @@ def select_category(filename, title, subjects, tags):
     """
     
     response = client.chat.completions.create(
-        model="gpt-4o",
+        model="gpt-4o-mini",
         messages=[
             {"role": "system", "content": "You are a helpful assistant that selects categories for images."},
             {"role": "user", "content": prompt}
@@ -202,9 +205,26 @@ def encode_image(image_path):
     with open(image_path, "rb") as image_file:
         return base64.b64encode(image_file.read()).decode("utf-8")
 
+def resize_image(input_path, output_path, max_size=(800, 800), quality=85):
+    """ ลดขนาดไฟล์ก่อนส่งให้ AI วิเคราะห์ """
+    with Image.open(input_path) as img:
+        img.thumbnail(max_size)
+        img.save(output_path, "JPEG", quality=quality)
+    return output_path  # คืนค่าพาธไฟล์ที่ถูกย่อ
+
 def analyze_image_with_vision(image_path):
 
     try:
+        """ ลดขนาดภาพก่อนส่งไปยัง OpenAI Vision API """
+        resized_path = "resized_" + os.path.basename(image_path)
+        resized_path = resize_image(image_path, resized_path)
+        print(f"ลดขนาดภาพ image path เป็น 800 x 800 พิกเซล ตำแหน่งอยู่ที่ {resized_path}")
+
+        if resized_path:
+            print(f"✅ ลดขนาดภาพเสร็จสิ้น! ไฟล์ใหม่: {resized_path}")
+        else:
+            print("❌ ลดขนาดภาพล้มเหลว")
+
         """ ส่งภาพไปยัง OpenAI Vision API """
         image_base64 = encode_image(image_path)
         print("แปลง image path เป็น image_base64")
@@ -216,9 +236,9 @@ def analyze_image_with_vision(image_path):
         prompt = f"""
         Analyze this image and generate metadata for microstock:
 
-        1. **Title**: A concise, SEO-friendly stock photo title (≤100 characters).
-        2. **Subjects**: A detailed 4-5 sentence description.
-        3. **Tags**: 49 single-word keywords, comma-separated.
+        1. Title: A concise, SEO-friendly stock photo title (≤100 characters).
+        2. Subjects: A detailed 4-5 sentence description.
+        3. Tags: 49 single-word keywords, comma-separated.
         - First 10 must include all key terms from the title.
         - The remaining 39 should be highly relevant but not plural.
         - Select at least 30 distinct important words to ensure variety.  
@@ -231,25 +251,22 @@ def analyze_image_with_vision(image_path):
         Tags: [Your tags here]
         """
         
-        with open(image_path, "rb") as image_file:
+        with open(resized_path, "rb") as image_file:
             response = client.chat.completions.create(
-                model="GPT-4o",
+                model="gpt-4o-mini",
                 messages=[
-                    {   "role": "system", 
-                        "content": "You are an AI that generates image metadata, including titles, descriptions, and SEO-optimized tags for stock photography platforms."
-                    },
-                    {
-                        "role": "user", 
-                        "content": [
-                            {"type": "image_url", "image_url": {"url":f"data:image/jpeg;base64,{image_base64}"}},
-                            {"type": "text", "text": prompt}
+                    {"role": "system", "content": "You are an AI that generates image metadata, including titles, descriptions, and SEO-optimized tags for stock photography platforms."},
+                    {"role": "user", "content": [
+                            {"type": "text", "text": prompt},
+                            {"type": "image_url", "image_url": {"url":f"data:image/jpeg;base64,{image_base64}"}}
                         ],
-                    } # ✅ ใช้ Base64
-                            #{"type": "image", "image": image_file.read()}]}
+                    } 
                 ],
                 max_tokens=300
             )
         
+        print(response.choices[0])
+
         # ✅ แสดงข้อมูลเครดิตที่ใช้ (Token Usage)
         if hasattr(response, 'usage'):
             print(f"Tokens used - Input: {response.usage.prompt_tokens}, Output: {response.usage.completion_tokens}, Total: {response.usage.total_tokens}")
@@ -258,6 +275,11 @@ def analyze_image_with_vision(image_path):
 
         # ดึงผลลัพธ์จาก AI
         print(f"Raw API response: {response.choices[0].message.content}")
+        raw_content = response.choices[0].message.content
+
+        # ใช้ Regex ลบ ** และ "Title:" ออก
+        clean_content = re.sub(r"\*\*(.*?)\*\*", r"\1", raw_content)  # ลบ Markdown **bold**
+        print(f"Cleaned API response: {clean_content}")
         
         result = response.choices[0].message.content.strip().split('\n')
         title, subjects, tags = "Untitled Image", "No subjects available", "image, unspecified"
@@ -356,8 +378,8 @@ def index():
                 filename = secure_filename(file.filename)
                 file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
                 file.save(file_path)
-                title, subjects, tags, category = generate_metadata(file_path)
-                #title, subjects, tags, category = generate_metadata_with_vision(file_path)
+                #title, subjects, tags, category = generate_metadata(file_path)
+                title, subjects, tags, category = generate_metadata_with_vision(file_path)
                 new_file_path = rename_file_with_title(file_path, title)
                 return jsonify({'status': 'success', 'message': f'ไฟล์ {filename} ถูกประมวลผลและเปลี่ยนชื่อเป็น {os.path.basename(new_file_path)}'})
             
@@ -376,8 +398,8 @@ def index():
                         file.save(file_path)
                         print(f"กำลังประมวลผลรูปภาพ: {filename}")
 
-                        title, subjects, tags, category = generate_metadata(file_path)
-                        #title, subjects, tags, category = generate_metadata_with_vision(file_path)
+                        #title, subjects, tags, category = generate_metadata(file_path)
+                        title, subjects, tags, category = generate_metadata_with_vision(file_path)
                         new_file_path = rename_file_with_title(file_path, title)
                         new_filename = os.path.basename(new_file_path)
                         
