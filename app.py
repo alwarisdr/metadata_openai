@@ -205,7 +205,7 @@ def encode_image(image_path):
     with open(image_path, "rb") as image_file:
         return base64.b64encode(image_file.read()).decode("utf-8")
 
-def resize_image(input_path, output_path, max_size=(800, 800), quality=85):
+def resize_image(input_path, output_path, max_size=(512, 512), quality=85):
     """ ลดขนาดไฟล์ก่อนส่งให้ AI วิเคราะห์ """
     with Image.open(input_path) as img:
         img.thumbnail(max_size)
@@ -218,15 +218,15 @@ def analyze_image_with_vision(image_path):
         """ ลดขนาดภาพก่อนส่งไปยัง OpenAI Vision API """
         resized_path = "resized_" + os.path.basename(image_path)
         resized_path = resize_image(image_path, resized_path)
-        print(f"ลดขนาดภาพ image path เป็น 800 x 800 พิกเซล ตำแหน่งอยู่ที่ {resized_path}")
+        print(f"ลดขนาดภาพ image path เป็น 512x512 พิกเซล ตำแหน่งอยู่ที่ {resized_path}")
 
         if resized_path:
             print(f"✅ ลดขนาดภาพเสร็จสิ้น! ไฟล์ใหม่: {resized_path}")
         else:
             print("❌ ลดขนาดภาพล้มเหลว")
 
-        """ ส่งภาพไปยัง OpenAI Vision API """
-        image_base64 = encode_image(image_path)
+        """ ส่งภาพที่ย่อแล้วไปยัง OpenAI Vision API """
+        image_base64 = encode_image(resized_path)
         print("แปลง image path เป็น image_base64")
 
         client = get_openai_client()
@@ -237,7 +237,7 @@ def analyze_image_with_vision(image_path):
         Analyze this image and generate metadata for microstock:
 
         1. Title: A concise, SEO-friendly stock photo title (≤100 characters).
-        2. Subjects: A detailed 4-5 sentence description.
+        2. Subjects: A detailed 3 sentence description.
         3. Tags: 49 single-word keywords, comma-separated.
         - First 10 must include all key terms from the title.
         - The remaining 39 should be highly relevant but not plural.
@@ -291,6 +291,11 @@ def analyze_image_with_vision(image_path):
                 subjects = line.split(":", 1)[1].strip()
             elif line.lower().startswith("tags:"):
                 tags = line.split(":", 1)[1].strip()
+
+        # หลังจากใช้งานเสร็จแล้ว ลบไฟล์ resized
+        if os.path.exists(resized_path):
+            os.remove(resized_path)
+            print(f"🗑️ ลบไฟล์ {resized_path} สำเร็จ")
         
         return title, subjects, tags
     except Exception as e:
